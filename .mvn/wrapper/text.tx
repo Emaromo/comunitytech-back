@@ -1,0 +1,17 @@
+unitytech-backend/
+├── src/
+│   └── main/
+│       ├── java/
+│       │   └── com/unitytech/backend/
+│       │       ├── controller/         <-- Controladores REST
+│       │       ├── dto/                <-- Objetos de transferencia (opcional pero limpio)
+│       │       ├── model/              <-- Entidades (JPA)
+│       │       ├── repository/         <-- Repositorios (JPARepository)
+│       │       ├── service/            <-- Lógica de negocio
+│       │       ├── security/           <-- Seguridad (JWT, Roles, Config)
+│       │       └── UnitytechBackendApplication.java
+│       └── resources/
+│           ├── application.properties
+│           └── static/
+│
+└── pom.xml

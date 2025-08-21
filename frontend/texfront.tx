@@ -1,0 +1,84 @@
+components/login/ → todo lo relacionado al login
+
+components/signup/ → todo lo relacionado al registro
+
+components/adminDashboard/ → componentes y vistas para admin (tus dashboards, tickets, etc)
+
+components/clienteDashboard/ → componentes y vistas para cliente
+
+utils/ → funciones utilitarias (manejo token, axios con token, parseo JWT)
+
+-------------------------------
+Estados:
+
+showLogin controla si se muestra el formulario de login o registro.
+
+role guarda el rol del usuario si el token está guardado y es válido.
+
+useEffect:
+
+Al iniciar la app, intenta detectar si el usuario ya tiene token y rol.
+
+Si lo tiene, carga directamente el dashboard correspondiente, saltando el login.
+
+Condicionales fuera del return:
+
+Si el usuario es admin o cliente, directamente se renderiza el dashboard.
+
+Si no, se muestra la pantalla de login/registro.
+
+UI:
+
+Fondo con imagen y capa oscura para buen contraste.
+
+Botones para alternar entre Login y Registro.
+
+Contenedores con clases Tailwind para estilo moderno y responsivo.
+---------------------
+🔐 Backend (Spring Boot)
+UserController.java
+
+Tiene endpoint /users para registrar.
+
+Tiene endpoint /users/login que:
+
+Verifica credenciales.
+
+Genera y devuelve un JWT válido usando JWTUtil.
+
+JWTUtil.java
+
+Usa jjwt 0.11.5 correctamente.
+
+Genera tokens firmados con HS512 usando una clave de al menos 512 bits.
+
+SecurityConfig.java
+
+Tiene configurado el filtro JWTAuthorizationFilter.
+
+Protege endpoints correctamente, usando roles ROLE_CLIENTE y ROLE_ADMIN.
+
+🌐 Frontend (React)
+App.js
+
+Muestra:
+
+Login / Signup si no hay token.
+
+Dashboard según el rol del token (ROLE_CLIENTE, ROLE_ADMIN).
+
+auth.js
+
+Lee token desde localStorage.
+
+Decodifica el JWT y extrae el role.
+
+Login.js
+
+Envía POST a /users/login con email y password.
+
+Guarda el token devuelto en localStorage.
+
+Signup.js
+
+Envía POST a /users con datos del nuevo usuario.

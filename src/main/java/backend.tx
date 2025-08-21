@@ -1,0 +1,317 @@
+🧠 1. ¿Qué hace tu app?
+Tu aplicación es un sistema de tickets de soporte técnico con:
+
+Registro y login de usuarios
+
+Control de acceso por rol (ADMIN, CLIENTE)
+
+Creación y gestión de tickets
+
+Protección con JWT
+
+Interfaz moderna en React (paneles separados por rol)
+
+🧱 2. Análisis por capas
+📦 ENTIDADES (@Entity) → se guardan en base de datos
+✅ UserEntity.java
+Qué es:
+Representa a un usuario en la base de datos.
+
+Campos:
+
+id, nombre, email, password, rol
+
+Para qué sirve:
+Este objeto se guarda en la tabla users. Contiene la info necesaria para autenticación y autorización.
+
+Se usa en:
+
+Login
+
+Registro
+
+Seguridad (para extraer email y rol)
+
+Encriptación de contraseñas
+
+✅ TicketModel.java
+Qué es:
+Representa un ticket de reparación o soporte.
+
+Campos:
+
+id, clienteEmail, descripcionProblema, estado, solucion, fechaCreacion, precio, prioridad
+
+Para qué sirve:
+Se guarda en la base de datos. Admins pueden crear/modificar, clientes solo ver el suyo.
+
+🗃️ 3. REPOSITORIOS → acceso a la base de datos
+✅ UserRepository.java
+Extiende: JpaRepository<UserEntity, Long>
+
+Qué hace:
+Permite buscar, guardar y verificar usuarios en la tabla users.
+
+Métodos clave:
+
+findByEmail(String email) → lo usa el login
+
+✅ TicketRepository.java
+Extiende: JpaRepository<TicketModel, Long>
+
+Qué hace:
+Accede a la tabla de tickets.
+
+Métodos clave personalizados:
+
+findByClienteEmail(String email) → para obtener el ticket del cliente
+
+🧠 4. SERVICIOS → lógica de negocio
+✅ UserService.java
+Qué hace:
+Controla el registro de usuarios.
+
+Acciones clave:
+
+Recibe el registro desde el controller
+
+Encripta la contraseña
+
+Guarda el usuario en la base de datos
+
+✅ TicketService.java
+Qué hace:
+Lógica para manejar tickets (crear, editar, borrar).
+
+Funciones clave:
+
+crearTicket(...)
+
+getTicketPorEmail(...)
+
+actualizarTicket(id, ticketActualizado)
+
+eliminarTicket(id)
+
+listarTodos()
+
+🧩 5. CONTROLADORES REST → entrada/salida HTTP
+✅ UserController.java
+Rutas:
+
+POST /users → registro
+
+POST /users/login → login
+
+Qué hace:
+
+Recibe credenciales
+
+Autentica usuario
+
+Devuelve token JWT con email + rol
+
+✅ TicketController.java
+Rutas protegidas:
+
+GET /tickets/cliente/{email} → cliente ve su ticket
+
+GET /tickets → lista completa (admin)
+
+POST /tickets → crear nuevo (admin)
+
+PUT /tickets/{id} → actualizar (admin)
+
+DELETE /tickets/{id} → borrar (admin)
+
+Protección por rol:
+
+Se configura con Spring Security para que:
+
+ROLE_ADMIN accede a todo
+
+ROLE_CLIENTE accede solo a su ticket por email
+
+📤 6. DTO → respuesta para frontend
+✅ UserRest.java
+Qué es:
+Un DTO (Data Transfer Object). Se usa para no devolver toda la entidad UserEntity al frontend.
+
+Contiene:
+
+id, nombre, email, rol
+
+¿Por qué no se usa directamente UserEntity?
+
+Por seguridad (no se devuelve la contraseña)
+
+Por orden (devuelve solo lo necesario)
+
+🔐 7. SEGURIDAD: filtros y JWT
+✅ JWTAuthorizationFilter.java
+Qué hace:
+
+Intercepta cada petición
+
+Valida el token JWT
+
+Extrae email y rol
+
+Crea Authentication y lo inyecta al sistema de Spring
+
+✅ JWTUtil.java
+Qué hace:
+
+Genera el JWT (generateToken(email, rol))
+
+Verifica validez (isTokenValid)
+
+Extrae datos (getEmail, getRole)
+
+✅ SecurityConfig.java
+Qué hace:
+
+Configura las reglas:
+
+/users y /users/login → públicos
+
+Resto → protegidos por JWT y rol
+
+Agrega el filtro JWTAuthorizationFilter
+
+Habilita CORS para React
+
+Define política stateless (sin sesiones)
+
+✅ SecurityConstants.java
+Qué hace:
+
+Define constantes comunes:
+
+Header: Authorization
+
+Prefijo: Bearer
+
+Clave secreta (base64)
+
+Tiempo de expiración
+
+🔄 8. FLUJO COMPLETO DE UNA PETICIÓN
+🔐 1. Login:
+Usuario se loguea → POST /users/login
+
+Se verifica la contraseña
+
+Se genera un token JWT con email y rol
+
+Se devuelve al frontend
+
+🧾 2. Peticiones protegidas:
+El frontend incluye el token en cada request:
+
+http
+Copiar
+Editar
+Authorization: Bearer <token>
+El filtro JWTAuthorizationFilter lo intercepta, valida y autoriza
+
+Según el rol, Spring permite o deniega el acceso al controlador
+
+🖼️ 9. DIAGRAMA CONCEPTUAL (lógico)
+less
+Copiar
+Editar
+React frontend
+     |
+     ↓
+Login/Register → [UserController] → [UserService] → [UserRepository] → BD
+     |
+     ↓
+JWT token ←-------------- [JWTUtil]
+     |
+     ↓
+(Con token) Request → [JWTFilter] → Spring Security → [TicketController]
+                                          |
+                       [TicketService] ←→ [TicketRepository] ←→ BD
+✅ 10. Relación de cada archivo y para qué sirve
+Componente	Tipo	Para qué sirve	Relación principal
+UserEntity	@Entity	Usuario guardado en BD	Seguridad, Login
+TicketModel	@Entity	Ticket en la BD	Admin, cliente
+UserRepository	DAO	Acceso a usuarios	Login, registro
+TicketRepository	DAO	Acceso a tickets	Listar, buscar por email
+UserService	Service	Lógica de usuarios	Registro
+TicketService	Service	Lógica de tickets	Admin Dashboard
+UserController	Controller	Login y registro	JWT, frontend
+TicketController	Controller	CRUD de tickets	Protegido por rol
+UserRest	DTO	Respuesta sin contraseña	Seguridad de respuesta
+JWTUtil	Utils	Generar y validar token	Seguridad
+JWTFilter	Filtro	Intercepta peticiones	Seguridad
+SecurityConfig	Config	Reglas de acceso	Seguridad JWT
+SecurityConstants	Constantes	Secretos y headers	Seguridad JWT
+
+1. Flujo completo: login y uso de token
+[Usuario ingresa email y password]
+        |
+        v
+ [POST /users/login] (UserRestController)
+        |
+        v
+ [LoginService -> valida -> genera JWT]
+        |
+        v
+   <- JWT con rol + email
+        |
+        v
+[Frontend guarda JWT en localStorage]
+        |
+        v
+ [Cada request incluye token en Header]
+        |
+        v
+ [JWTAuthorizationFilter valida]
+        |
+        v
+ [Spring Security deja pasar si es válido]
+        |
+        v
+[Se accede al controlador correspondiente]
+-------------------------------------------------
+2. Diagrama de capas (backend)
+ontroladores (REST)
+    |
+Servicios (Service)
+    |
+Repositorios (JPA Repository)
+    |
+Base de datos (H2 / MySQL)
+-----------------------------------------------
+3. Seguridad
+
++-------------------------------+
+|         Usuario               |
++-------------------------------+
+             |
+             | (Login)
+             v
++-------------------------------+
+|       LoginService + JWTUtil |
++-------------------------------+
+             |
+             v
+[Token JWT generado con rol + email]
+             |
+             v
+[Frontend lo guarda y lo envía en requests]
+             |
+             v
++-------------------------------+
+|    JWTAuthorizationFilter    |
++-------------------------------+
+             |
+             v
+ [Token válido? -> Acceso OK]
+             |
+             v
++-------------------------------+
+|      Controladores REST      |
++-------------------------------+
