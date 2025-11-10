@@ -1,3 +1,12 @@
-echo target/ > .gitignore
-echo frontend/ >> .gitignore
-echo node_modules/ >> .gitignore
+# Archivos y carpetas que no deben subirse al repo
+target/
+frontend/
+node_modules/
+*.log
+*.class
+*.jar
+*.war
+*.iml
+.DS_Store
+.idea/
+.vscode/
