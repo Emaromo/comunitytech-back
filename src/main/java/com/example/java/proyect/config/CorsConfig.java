@@ -8,14 +8,6 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter;
 
-/**
- * Configuración global de CORS.
- * 
- * Permite:
- *  - Peticiones desde localhost (desarrollo)
- *  - Peticiones desde la IP del VPS (EasyPanel)
- *  - Peticiones desde dominio en producción
- */
 @Configuration
 public class CorsConfig {
 
@@ -23,37 +15,36 @@ public class CorsConfig {
     public CorsFilter corsFilter() {
         CorsConfiguration config = new CorsConfiguration();
 
-        /**
-         * ================================================================
-         * 🌍 ORÍGENES PERMITIDOS
-         * ================================================================
-         * Dejamos tu origen original (localhost:3000) tal cual,
-         * y agregamos los de producción.
-         */
+        // Permite enviar cookies, Authorization y JWT
+        config.setAllowCredentials(true);
+
+        // ==========================
+        // 🌍 ORÍGENES PERMITIDOS
+        // ==========================
         config.setAllowedOrigins(Arrays.asList(
-            // 🔵 Tu entorno local (ya te funcionaba)
+            // 🔵 Entorno local
             "http://localhost:3000",
 
-            // 🟣 EasyPanel / IP del VPS
+            // 🟣 IP del VPS (sin HTTPS)
             "http://66.97.42.236",
             "http://66.97.42.236:8080",
             "http://66.97.42.236:8082",
 
-            // 🌐 Dominio en producción (por si usás SSL)
+            // 🌐 Dominio de producción (frontend)
             "https://comunitytech.com.ar",
-            "http://comunitytech.com.ar"
+            "https://www.comunitytech.com.ar",
+
+            // 🔥 Dominio del backend (IMPORTANTE!)
+            "https://api.comunitytech.com.ar"
         ));
-
-        // Permite credenciales y tokens JWT
-        config.setAllowCredentials(true);
-
-        // Permite todos los headers
-        config.addAllowedHeader("*");
 
         // Permite todos los métodos HTTP
         config.addAllowedMethod("*");
 
-        // Aplica la configuración a toda la API
+        // Permite todos los headers
+        config.addAllowedHeader("*");
+
+        // URLs afectadas (toda la API)
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
 
