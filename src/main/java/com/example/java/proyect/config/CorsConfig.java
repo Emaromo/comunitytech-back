@@ -9,38 +9,54 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter;
 
 /**
- * Configuración global de CORS para la aplicación.
+ * Configuración global de CORS.
  * 
- * Esta clase crea un filtro que permite que el backend acepte peticiones
- * desde el frontend en http://localhost:3001 (tu React app).
+ * Permite:
+ *  - Peticiones desde localhost (desarrollo)
+ *  - Peticiones desde la IP del VPS (EasyPanel)
+ *  - Peticiones desde dominio en producción
  */
 @Configuration
 public class CorsConfig {
 
     @Bean
     public CorsFilter corsFilter() {
-        // Creamos una configuración CORS
         CorsConfiguration config = new CorsConfiguration();
 
-        // Permitimos peticiones solo desde este origen (tu frontend React)
-        config.setAllowedOrigins(Arrays.asList("http://localhost:3000"));
+        /**
+         * ================================================================
+         * 🌍 ORÍGENES PERMITIDOS
+         * ================================================================
+         * Dejamos tu origen original (localhost:3000) tal cual,
+         * y agregamos los de producción.
+         */
+        config.setAllowedOrigins(Arrays.asList(
+            // 🔵 Tu entorno local (ya te funcionaba)
+            "http://localhost:3000",
 
-        // Permitimos que se envíen credenciales (cookies, headers Authorization, etc)
+            // 🟣 EasyPanel / IP del VPS
+            "http://66.97.42.236",
+            "http://66.97.42.236:8080",
+            "http://66.97.42.236:8082",
+
+            // 🌐 Dominio en producción (por si usás SSL)
+            "https://comunitytech.com.ar",
+            "http://comunitytech.com.ar"
+        ));
+
+        // Permite credenciales y tokens JWT
         config.setAllowCredentials(true);
 
-        // Permitimos todos los headers (Content-Type, Authorization, etc)
+        // Permite todos los headers
         config.addAllowedHeader("*");
 
-        // Permitimos todos los métodos HTTP (GET, POST, PUT, DELETE, OPTIONS, etc)
+        // Permite todos los métodos HTTP
         config.addAllowedMethod("*");
 
-        // Fuente que aplicará la configuración a todas las rutas ("**")
+        // Aplica la configuración a toda la API
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-
-        // Registramos la configuración para todas las rutas de la API
         source.registerCorsConfiguration("/**", config);
 
-        // Retornamos un filtro que aplica esta configuración en cada petición
         return new CorsFilter(source);
     }
 }
