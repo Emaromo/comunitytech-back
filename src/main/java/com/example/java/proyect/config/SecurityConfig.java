@@ -5,11 +5,14 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.lang.NonNull;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.firewall.HttpFirewall;
+import org.springframework.security.web.firewall.StrictHttpFirewall;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
@@ -18,6 +21,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
  * - JWT
  * - Rutas protegidas vs públicas
  * - CORS para frontend local y producción
+ * - Permitir caracteres en URL como %0A para evitar bloqueos
  */
 @Configuration
 public class SecurityConfig {
@@ -100,5 +104,24 @@ public class SecurityConfig {
                         .allowCredentials(true);
             }
         };
+    }
+
+    // 🔓 Permitir caracteres especiales en URL como %0A
+    @Bean
+    public HttpFirewall allowUrlEncodedHttpFirewall() {
+        StrictHttpFirewall firewall = new StrictHttpFirewall();
+        firewall.setAllowUrlEncodedPercent(true);        // Permite %xx como %0A
+        firewall.setAllowBackSlash(true);                // Permite \
+        firewall.setAllowUrlEncodedSlash(true);          // Permite %2F
+        firewall.setAllowUrlEncodedDoubleSlash(true);    // Permite %2F%2F
+        firewall.setAllowUrlEncodedPeriod(true);         // Permite %2E
+        firewall.setAllowSemicolon(true);                // Permite ;
+        return firewall;
+    }
+
+    // 📦 Usamos el firewall personalizado
+    @Bean
+    public WebSecurityCustomizer webSecurityCustomizer(HttpFirewall firewall) {
+        return (web) -> web.httpFirewall(firewall);
     }
 }
