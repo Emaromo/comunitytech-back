@@ -17,16 +17,15 @@ import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
- * Configuración de seguridad:
- * - JWT
- * - Rutas protegidas vs públicas
- * - CORS para frontend local y producción
- * - Permitir caracteres en URL como %0A para evitar bloqueos
+ * ⚙️ Configuración de seguridad de Spring Security
+ * - Protege rutas con JWT
+ * - Habilita CORS para frontend
+ * - Permite ciertos caracteres especiales en URLs (como %0A)
  */
 @Configuration
 public class SecurityConfig {
 
-    // 🔐 Codificador de contraseñas (BCrypt)
+    // 🔐 Codificador de contraseñas con BCrypt
     @Bean
     public BCryptPasswordEncoder bCryptPasswordEncoder() {
         return new BCryptPasswordEncoder();
@@ -37,11 +36,40 @@ public class SecurityConfig {
         return bCryptPasswordEncoder();
     }
 
-    // 🔐 Configuración principal de seguridad
+    /**
+     * 🔐 Configuración del firewall para permitir ciertos caracteres codificados.
+     * Soluciona errores como "%0A" en URLs rechazadas por Spring Security.
+     */
+    @Bean
+    public HttpFirewall allowUrlEncodedHttpFirewall() {
+        StrictHttpFirewall firewall = new StrictHttpFirewall();
+
+        // ✅ Permite ciertos caracteres especiales en las URLs
+        firewall.setAllowUrlEncodedPercent(true);        // %xx (ej: %0A)
+        firewall.setAllowBackSlash(true);                // \
+        firewall.setAllowUrlEncodedSlash(true);          // %2F
+        firewall.setAllowUrlEncodedDoubleSlash(true);    // %2F%2F
+        firewall.setAllowUrlEncodedPeriod(true);         // %2E
+        firewall.setAllowSemicolon(true);                // ;
+
+        return firewall;
+    }
+
+    // 📦 Aplica el firewall personalizado a todo el proyecto
+    @Bean
+    public WebSecurityCustomizer webSecurityCustomizer(HttpFirewall firewall) {
+        return (web) -> web.httpFirewall(firewall);
+    }
+
+    /**
+     * 🔐 Cadena de filtros de seguridad
+     * - Protege rutas con JWT
+     * - Define qué rutas son públicas y cuáles requieren token
+     */
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-            // 🌐 CORS habilitado para frontend local y producción
+            // 🌐 Habilita CORS (configurado más abajo)
             .cors(cors -> cors.configurationSource(request -> {
                 var config = new org.springframework.web.cors.CorsConfiguration();
                 config.setAllowedOrigins(java.util.List.of(
@@ -50,14 +78,14 @@ public class SecurityConfig {
                 ));
                 config.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
                 config.setAllowedHeaders(java.util.List.of("*"));
-                config.setAllowCredentials(true); // ✅ Si usás cookies o headers de autenticación
+                config.setAllowCredentials(true); // ✅ Importante para enviar cookies o headers de auth
                 return config;
             }))
 
-            // 🚫 Desactivar CSRF (usamos JWT, no sesiones)
+            // ❌ Desactiva CSRF (no usamos sesiones, solo JWT)
             .csrf(csrf -> csrf.disable())
 
-            // 🔐 Reglas de acceso a rutas
+            // 🛡️ Define acceso a rutas
             .authorizeHttpRequests(auth -> auth
                 // Rutas públicas
                 .requestMatchers("/", "/index", "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", "/swagger-resources/**").permitAll()
@@ -66,29 +94,32 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/users/login").permitAll()
                 .requestMatchers("/test-email").permitAll()
 
-                // Rutas autenticadas
+                // Rutas que requieren login (JWT válido)
                 .requestMatchers("/tickets/cliente/**").authenticated()
                 .requestMatchers(HttpMethod.PUT, "/tickets/*/notificacion").authenticated()
 
-                // Rutas solo para admin
+                // Rutas solo para administradores
                 .requestMatchers(HttpMethod.PUT, "/tickets/**").hasAuthority("ROLE_ADMIN")
                 .requestMatchers(HttpMethod.DELETE, "/tickets/**").hasAuthority("ROLE_ADMIN")
                 .requestMatchers(HttpMethod.POST, "/tickets").hasAuthority("ROLE_ADMIN")
 
-                // Cualquier otra ruta requiere autenticación
+                // Todo lo demás requiere estar autenticado
                 .anyRequest().authenticated()
             )
 
-            // 🚫 No usar sesiones: cada request debe tener JWT
+            // 🚫 No usamos sesiones, solo JWT
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-            // ➕ Agregar filtro JWT personalizado antes del filtro por defecto
+            // ➕ Filtro JWT personalizado antes del filtro de autenticación por defecto
             .addFilterBefore(new JWTAuthorizationFilter(), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 
-    // 🌐 Configuración global para permitir CORS desde frontend local y producción
+    /**
+     * 🌍 Configuración global de CORS
+     * Permite que el frontend se comunique con el backend desde dominios distintos
+     */
     @Bean
     public WebMvcConfigurer corsConfigurer() {
         return new WebMvcConfigurer() {
@@ -96,32 +127,13 @@ public class SecurityConfig {
             public void addCorsMappings(@NonNull CorsRegistry registry) {
                 registry.addMapping("/**")
                         .allowedOrigins(
-                            "http://localhost:3000",        // 🧪 Desarrollo local
-                            "https://comunitytech.com.ar"   // 🌐 Producción
+                            "http://localhost:3000",        // Local
+                            "https://comunitytech.com.ar"   // Producción
                         )
                         .allowedMethods("*")
                         .allowedHeaders("*")
-                        .allowCredentials(true);
+                        .allowCredentials(true); // Necesario para que funcione con JWT + cookies si se usan
             }
         };
-    }
-
-    // 🔓 Permitir caracteres especiales en URL como %0A
-    @Bean
-    public HttpFirewall allowUrlEncodedHttpFirewall() {
-        StrictHttpFirewall firewall = new StrictHttpFirewall();
-        firewall.setAllowUrlEncodedPercent(true);        // Permite %xx como %0A
-        firewall.setAllowBackSlash(true);                // Permite \
-        firewall.setAllowUrlEncodedSlash(true);          // Permite %2F
-        firewall.setAllowUrlEncodedDoubleSlash(true);    // Permite %2F%2F
-        firewall.setAllowUrlEncodedPeriod(true);         // Permite %2E
-        firewall.setAllowSemicolon(true);                // Permite ;
-        return firewall;
-    }
-
-    // 📦 Usamos el firewall personalizado
-    @Bean
-    public WebSecurityCustomizer webSecurityCustomizer(HttpFirewall firewall) {
-        return (web) -> web.httpFirewall(firewall);
     }
 }
