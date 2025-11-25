@@ -1,6 +1,6 @@
 package com.example.java.proyect.config;
 
-import java.util.Arrays;
+import java.util.List;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -11,41 +11,34 @@ import org.springframework.web.filter.CorsFilter;
 @Configuration
 public class CorsConfig {
 
+    /**
+     * 🌐 Filtro CORS global
+     * Permite que el frontend pueda comunicarse con el backend desde otros orígenes (dominios)
+     */
     @Bean
     public CorsFilter corsFilter() {
         CorsConfiguration config = new CorsConfiguration();
 
-        // Permite enviar cookies, Authorization y JWT
+        // ✅ Habilita cookies y headers como Authorization
         config.setAllowCredentials(true);
 
-        // ==========================
+        // ========================================
         // 🌍 ORÍGENES PERMITIDOS
-        // ==========================
-        config.setAllowedOrigins(Arrays.asList(
-            // 🔵 Entorno local
-            "http://localhost:3000",
-
-            // 🟣 IP del VPS (sin HTTPS)
-            "http://66.97.42.236",
-            "http://66.97.42.236:8080",
-            "http://66.97.42.236:8082",
-
-            // 🌐 Dominio de producción (frontend)
-            "https://comunitytech.com.ar",
-            "https://www.comunitytech.com.ar",
-            
-
-            // 🔥 Dominio del backend (IMPORTANTE!)
-            "https://api.comunitytech.com.ar"
+        // ⚠️ Usa patrones para evitar error 403 en producción con HTTPS + cookies
+        // ========================================
+        config.setAllowedOriginPatterns(List.of(
+            "http://localhost:3000",              // 💻 Desarrollo local (React)
+            "https://comunitytech.com.ar",        // 🌐 Producción
+            "https://www.comunitytech.com.ar"     // 🌐 www también (en caso de usarlo)
         ));
 
-        // Permite todos los métodos HTTP
+        // ✅ Métodos HTTP permitidos
         config.addAllowedMethod("*");
 
-        // Permite todos los headers
+        // ✅ Headers permitidos
         config.addAllowedHeader("*");
 
-        // URLs afectadas (toda la API)
+        // ✅ Aplica a toda la API
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
 
