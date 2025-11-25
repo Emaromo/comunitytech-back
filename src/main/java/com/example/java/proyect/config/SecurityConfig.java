@@ -74,7 +74,8 @@ public class SecurityConfig {
                 var config = new org.springframework.web.cors.CorsConfiguration();
                 config.setAllowedOrigins(java.util.List.of(
                     "http://localhost:3000",           // 🧪 Frontend local
-                    "https://comunitytech.com.ar"      // 🌐 Producción
+                    "https://comunitytech.com.ar" ,    // 🌐 Producción
+                    "https://api.comunitytech.com.ar"
                 ));
                 config.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
                 config.setAllowedHeaders(java.util.List.of("*"));

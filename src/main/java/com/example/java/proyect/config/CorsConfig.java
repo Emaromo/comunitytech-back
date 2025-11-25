@@ -33,6 +33,7 @@ public class CorsConfig {
             // 🌐 Dominio de producción (frontend)
             "https://comunitytech.com.ar",
             "https://www.comunitytech.com.ar",
+            
 
             // 🔥 Dominio del backend (IMPORTANTE!)
             "https://api.comunitytech.com.ar"
