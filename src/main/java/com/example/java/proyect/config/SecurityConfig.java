@@ -13,20 +13,10 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.security.web.firewall.HttpFirewall;
 import org.springframework.security.web.firewall.StrictHttpFirewall;
 
-/**
- * 🔐 SecurityConfig
- *
- * Configura toda la seguridad de la aplicación:
- *  - Define qué rutas son públicas, autenticadas y de administrador.
- *  - Integra JWT (sin sesiones).
- *  - No maneja CORS aquí, porque está centralizado en CorsConfig.java.
- *  - TOTALMENTE COMPATIBLE con front local y producción.
- */
-
 @Configuration
 public class SecurityConfig {
 
-    /** 1️⃣ — Codificador de contraseñas con BCrypt (encriptación segura) */
+    /** 🔐 Codificador de contraseñas seguro (BCrypt) */
     @Bean
     public BCryptPasswordEncoder bCryptPasswordEncoder() {
         return new BCryptPasswordEncoder();
@@ -37,7 +27,7 @@ public class SecurityConfig {
         return bCryptPasswordEncoder();
     }
 
-    /** 2️⃣ — Firewall permisivo para permitir rutas con caracteres especiales (evita errores %2F o %20) */
+    /** 🚧 Firewall permisivo (permite caracteres codificados en URLs) */
     @Bean
     public HttpFirewall allowUrlEncodedHttpFirewall() {
         StrictHttpFirewall firewall = new StrictHttpFirewall();
@@ -52,55 +42,51 @@ public class SecurityConfig {
 
     @Bean
     public WebSecurityCustomizer webSecurityCustomizer(HttpFirewall firewall) {
-        return (web) -> web.httpFirewall(firewall);
+        return web -> web.httpFirewall(firewall);
     }
 
-    /**
-     * 3️⃣ — Cadena principal de seguridad:
-     *  - No usamos sesiones → modo STATELESS (JWT)
-     *  - Se desactiva CSRF
-     *  - Se definen rutas públicas, autenticadas y de admin.
-     *  - Se integra nuestro filtro JWT (JWTAuthorizationFilter).
-     */
+    /** 🔐 Configuración principal de seguridad (filtros, rutas y JWT) */
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 
         http
-            /** 🚫 1. Deshabilitar CSRF porque usamos JWT (no cookies, no formularios) */
-            .csrf(csrf -> csrf.disable())
+            .csrf(csrf -> csrf.disable()) // No usamos CSRF porque trabajamos con JWT
 
-            /** 🛡️ 2. Configurar reglas de acceso por rutas */
             .authorizeHttpRequests(auth -> auth
 
-                /** 🔓 RUTAS PÚBLICAS → no requieren token */
+                /** 🔓 RUTAS PÚBLICAS (sin token requerido) */
                 .requestMatchers(
-                    "/login",           // Login principal
-                    "/api/login",       // Opción alternativa si algún endpoint usa /api
-                    "/users",           // Registro
-                    "/users/login",     // Si el login está mapeado así
-                    "/test-email",      // Endpoint libre
-                    "/", "/index",      // Entrada pública
+                    "/", "/index",
                     "/swagger-ui.html", "/swagger-ui/**",
-                    "/v3/api-docs/**", "/swagger-resources/**"
+                    "/v3/api-docs/**", "/swagger-resources/**",
+
+                    // 🚀 Login permitidos (todas las variantes)
+                    "/login", "/api/login", "/users/login",
+
+                    // 🚀 Registro de usuarios (todas las variantes)
+                    HttpMethod.POST, "/users", "/api/users", "/users/**", "/api/users/**",
+
+                    // 🚀 Endpoint opcional de test email
+                    "/test-email"
                 ).permitAll()
 
-                /** 👤 RUTAS QUE REQUIEREN USUARIO AUTENTICADO (ROLE_CLIENTE o ROLE_ADMIN) */
+                /** 👤 RUTAS QUE REQUIEREN USUARIO AUTENTICADO */
                 .requestMatchers("/tickets/cliente/**").authenticated()
                 .requestMatchers(HttpMethod.PUT, "/tickets/*/notificacion").authenticated()
 
-                /** 👑 RUTAS EXCLUSIVAMENTE ADMINISTRADOR */
+                /** 👑 RUTAS SOLO PARA ADMINISTRADORES */
                 .requestMatchers(HttpMethod.POST, "/tickets").hasAuthority("ROLE_ADMIN")
                 .requestMatchers(HttpMethod.PUT, "/tickets/**").hasAuthority("ROLE_ADMIN")
                 .requestMatchers(HttpMethod.DELETE, "/tickets/**").hasAuthority("ROLE_ADMIN")
 
-                /** ⚠️ Cualquier otra ruta requiere autenticación */
+                /** 🔒 Cualquier otra ruta requiere autenticación */
                 .anyRequest().authenticated()
             )
 
-            /** ♻️ 3. Forzamos modo STATELESS (sin sesiones, solo JWT) */
+            /** ♻️ Modo sin sesiones → usamos solo JWT */
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-            /** 🔌 4. Agregamos nuestro filtro JWT antes del filtro de autenticación */
+            /** ⚙️ Aplicamos nuestro filtro JWT antes del default */
             .addFilterBefore(new JWTAuthorizationFilter(), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
