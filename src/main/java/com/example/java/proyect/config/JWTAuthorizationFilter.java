@@ -17,57 +17,78 @@ import jakarta.servlet.http.HttpServletResponse;
 
 /**
  * 🔐 Filtro de autorización JWT
- * 
- * Este filtro se ejecuta una sola vez por petición (OncePerRequestFilter)
- * y valida el token JWT incluido en el encabezado Authorization.
- * Si es válido, extrae los datos del usuario y los inyecta en el contexto de seguridad de Spring.
+ *
+ * Este filtro se ejecuta en **cada petición** (OncePerRequestFilter) y valida si:
+ *  1️⃣ La ruta requiere autenticación
+ *  2️⃣ El token JWT es válido
+ *  3️⃣ Extrae el email y rol del usuario desde el token
+ *  4️⃣ Inserta la autenticación en el contexto de Spring Security
+ *
+ * Si la ruta es pública (login, registro, test-email), NO aplica validación JWT.
  */
 public class JWTAuthorizationFilter extends OncePerRequestFilter {
 
     @Override
-    protected void doFilterInternal(@NonNull HttpServletRequest request,
-                                    @NonNull HttpServletResponse response,
-                                    @NonNull FilterChain filterChain)
-                                    throws ServletException, IOException {
+    protected void doFilterInternal(
+            @NonNull HttpServletRequest request,
+            @NonNull HttpServletResponse response,
+            @NonNull FilterChain filterChain)
+            throws ServletException, IOException {
 
-        // ⛔ Excluir rutas públicas (registro y login) del filtro
+        // 1️⃣ Obtener la ruta solicitada
         String path = request.getServletPath();
-        if (path.equals("/users") || path.equals("/users/login") || path.equals("/test-email")) {
-    filterChain.doFilter(request, response);
-    return;
-}
 
-        // 1️⃣ Obtenemos el header Authorization
+        /**
+         * 🔓 Rutas públicas (NO deben requerir token JWT)
+         * - /login            → iniciar sesión
+         * - /users            → registrar usuario
+         * - /test-email       → pruebas de email
+         * - /api/login        → login alternativo si se usa /api
+         * - /users/login      → variante del login
+         */
+        if (
+            path.equals("/login") ||
+            path.equals("/api/login") ||
+            path.equals("/users") ||
+            path.equals("/users/login") ||
+            path.equals("/test-email")
+        ) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        // 2️⃣ Leer el encabezado Authorization
         String header = request.getHeader(SecurityConstants.HEADER_STRING);
 
-        // 2️⃣ Si no tiene token o no empieza con "Bearer ", dejamos pasar sin autenticar
+        // ❌ Si NO hay token o no empieza con "Bearer ", dejamos que siga SIN autenticar
         if (header == null || !header.startsWith(SecurityConstants.TOKEN_PREFIX + " ")) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        // 3️⃣ Extraemos el token (sacamos "Bearer ")
+        // 3️⃣ Extraer el token quitando el prefijo "Bearer "
         String token = header.replace(SecurityConstants.TOKEN_PREFIX + " ", "");
 
-        // 4️⃣ Verificamos si el token es válido
+        // 4️⃣ Validar el token (firma + expiración)
         if (JWTUtil.isTokenValid(token)) {
-            // 5️⃣ Extraemos los claims (datos del token)
+            // 5️⃣ Extraer los claims (datos del token)
             Claims claims = JWTUtil.getClaims(token);
-            String email = claims.getSubject(); // Usuario autenticado
-            String role = claims.get("role", String.class); // Rol: ROLE_CLIENTE o ROLE_ADMIN
+            String email = claims.getSubject(); // 📧 Email del usuario
+            String role = claims.get("role", String.class); // 🎭 ROLE_CLIENTE o ROLE_ADMIN
 
-            // 6️⃣ Creamos el objeto de autenticación con ese email y rol
-            UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                    email,
-                    null,
-                    Collections.singletonList(new SimpleGrantedAuthority(role))
-            );
+            // 6️⃣ Crear objeto de autenticación con email y rol
+            UsernamePasswordAuthenticationToken authentication =
+                    new UsernamePasswordAuthenticationToken(
+                            email,
+                            null,
+                            Collections.singletonList(new SimpleGrantedAuthority(role))
+                    );
 
-            // 7️⃣ Lo seteamos en el contexto de seguridad de Spring
+            // 7️⃣ Establecer autenticación en el contexto de Spring
             SecurityContextHolder.getContext().setAuthentication(authentication);
         }
 
-        // 8️⃣ Continuamos con el resto del filtro o endpoint
+        // 8️⃣ Continuar con el resto del filtro o endpoint
         filterChain.doFilter(request, response);
     }
 }

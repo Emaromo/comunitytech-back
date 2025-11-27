@@ -3,7 +3,6 @@ package com.example.java.proyect.config;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
-import org.springframework.lang.NonNull;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -13,19 +12,21 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.firewall.HttpFirewall;
 import org.springframework.security.web.firewall.StrictHttpFirewall;
-import org.springframework.web.servlet.config.annotation.CorsRegistry;
-import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
- * ⚙️ Configuración de seguridad de Spring Security
- * - Protege rutas con JWT
- * - Habilita CORS para frontend
- * - Permite ciertos caracteres especiales en URLs (como %0A)
+ * 🔐 SecurityConfig
+ *
+ * Configura toda la seguridad de la aplicación:
+ *  - Define qué rutas son públicas, autenticadas y de administrador.
+ *  - Integra JWT (sin sesiones).
+ *  - No maneja CORS aquí, porque está centralizado en CorsConfig.java.
+ *  - TOTALMENTE COMPATIBLE con front local y producción.
  */
+
 @Configuration
 public class SecurityConfig {
 
-    // 🔐 Codificador de contraseñas con BCrypt
+    /** 1️⃣ — Codificador de contraseñas con BCrypt (encriptación segura) */
     @Bean
     public BCryptPasswordEncoder bCryptPasswordEncoder() {
         return new BCryptPasswordEncoder();
@@ -36,105 +37,72 @@ public class SecurityConfig {
         return bCryptPasswordEncoder();
     }
 
-    /**
-     * 🔐 Configuración del firewall para permitir ciertos caracteres codificados.
-     * Soluciona errores como "%0A" en URLs rechazadas por Spring Security.
-     */
+    /** 2️⃣ — Firewall permisivo para permitir rutas con caracteres especiales (evita errores %2F o %20) */
     @Bean
     public HttpFirewall allowUrlEncodedHttpFirewall() {
         StrictHttpFirewall firewall = new StrictHttpFirewall();
-
-        // ✅ Permite ciertos caracteres especiales en las URLs
-        firewall.setAllowUrlEncodedPercent(true);        // %xx (ej: %0A)
-        firewall.setAllowBackSlash(true);                // \
-        firewall.setAllowUrlEncodedSlash(true);          // %2F
-        firewall.setAllowUrlEncodedDoubleSlash(true);    // %2F%2F
-        firewall.setAllowUrlEncodedPeriod(true);         // %2E
-        firewall.setAllowSemicolon(true);                // ;
-
+        firewall.setAllowUrlEncodedPercent(true);
+        firewall.setAllowBackSlash(true);
+        firewall.setAllowUrlEncodedSlash(true);
+        firewall.setAllowUrlEncodedDoubleSlash(true);
+        firewall.setAllowUrlEncodedPeriod(true);
+        firewall.setAllowSemicolon(true);
         return firewall;
     }
 
-    // 📦 Aplica el firewall personalizado a todo el proyecto
     @Bean
     public WebSecurityCustomizer webSecurityCustomizer(HttpFirewall firewall) {
         return (web) -> web.httpFirewall(firewall);
     }
 
     /**
-     * 🔐 Cadena de filtros de seguridad
-     * - Protege rutas con JWT
-     * - Define qué rutas son públicas y cuáles requieren token
+     * 3️⃣ — Cadena principal de seguridad:
+     *  - No usamos sesiones → modo STATELESS (JWT)
+     *  - Se desactiva CSRF
+     *  - Se definen rutas públicas, autenticadas y de admin.
+     *  - Se integra nuestro filtro JWT (JWTAuthorizationFilter).
      */
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        http
-            // 🌐 Habilita CORS (configurado más abajo)
-            .cors(cors -> cors.configurationSource(request -> {
-                var config = new org.springframework.web.cors.CorsConfiguration();
-                config.setAllowedOrigins(java.util.List.of(
-                    "http://localhost:3000",           // 🧪 Frontend local
-                    "https://comunitytech.com.ar" ,    // 🌐 Producción
-                    "https://api.comunitytech.com.ar"
-                ));
-                config.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-                config.setAllowedHeaders(java.util.List.of("*"));
-                config.setAllowCredentials(true); // ✅ Importante para enviar cookies o headers de auth
-                return config;
-            }))
 
-            // ❌ Desactiva CSRF (no usamos sesiones, solo JWT)
+        http
+            /** 🚫 1. Deshabilitar CSRF porque usamos JWT (no cookies, no formularios) */
             .csrf(csrf -> csrf.disable())
 
-            // 🛡️ Define acceso a rutas
+            /** 🛡️ 2. Configurar reglas de acceso por rutas */
             .authorizeHttpRequests(auth -> auth
-                // Rutas públicas
-                .requestMatchers("/", "/index", "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", "/swagger-resources/**").permitAll()
-                .requestMatchers("/api/**").permitAll()
-                .requestMatchers(HttpMethod.POST, "/users").permitAll()
-                .requestMatchers(HttpMethod.POST, "/users/login").permitAll()
-                .requestMatchers("/test-email").permitAll()
 
-                // Rutas que requieren login (JWT válido)
+                /** 🔓 RUTAS PÚBLICAS → no requieren token */
+                .requestMatchers(
+                    "/login",           // Login principal
+                    "/api/login",       // Opción alternativa si algún endpoint usa /api
+                    "/users",           // Registro
+                    "/users/login",     // Si el login está mapeado así
+                    "/test-email",      // Endpoint libre
+                    "/", "/index",      // Entrada pública
+                    "/swagger-ui.html", "/swagger-ui/**",
+                    "/v3/api-docs/**", "/swagger-resources/**"
+                ).permitAll()
+
+                /** 👤 RUTAS QUE REQUIEREN USUARIO AUTENTICADO (ROLE_CLIENTE o ROLE_ADMIN) */
                 .requestMatchers("/tickets/cliente/**").authenticated()
                 .requestMatchers(HttpMethod.PUT, "/tickets/*/notificacion").authenticated()
 
-                // Rutas solo para administradores
+                /** 👑 RUTAS EXCLUSIVAMENTE ADMINISTRADOR */
+                .requestMatchers(HttpMethod.POST, "/tickets").hasAuthority("ROLE_ADMIN")
                 .requestMatchers(HttpMethod.PUT, "/tickets/**").hasAuthority("ROLE_ADMIN")
                 .requestMatchers(HttpMethod.DELETE, "/tickets/**").hasAuthority("ROLE_ADMIN")
-                .requestMatchers(HttpMethod.POST, "/tickets").hasAuthority("ROLE_ADMIN")
 
-                // Todo lo demás requiere estar autenticado
+                /** ⚠️ Cualquier otra ruta requiere autenticación */
                 .anyRequest().authenticated()
             )
 
-            // 🚫 No usamos sesiones, solo JWT
+            /** ♻️ 3. Forzamos modo STATELESS (sin sesiones, solo JWT) */
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-            // ➕ Filtro JWT personalizado antes del filtro de autenticación por defecto
+            /** 🔌 4. Agregamos nuestro filtro JWT antes del filtro de autenticación */
             .addFilterBefore(new JWTAuthorizationFilter(), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
-    }
-
-    /**
-     * 🌍 Configuración global de CORS
-     * Permite que el frontend se comunique con el backend desde dominios distintos
-     */
-    @Bean
-    public WebMvcConfigurer corsConfigurer() {
-        return new WebMvcConfigurer() {
-            @Override
-            public void addCorsMappings(@NonNull CorsRegistry registry) {
-                registry.addMapping("/**")
-                        .allowedOrigins(
-                            "http://localhost:3000",        // Local
-                            "https://comunitytech.com.ar"   // Producción
-                        )
-                        .allowedMethods("*")
-                        .allowedHeaders("*")
-                        .allowCredentials(true); // Necesario para que funcione con JWT + cookies si se usan
-            }
-        };
     }
 }
