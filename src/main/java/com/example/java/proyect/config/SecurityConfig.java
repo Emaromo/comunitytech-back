@@ -13,7 +13,6 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @Configuration
 public class SecurityConfig {
 
-    // Bean para encriptar contraseñas
     @Bean
     public BCryptPasswordEncoder bCryptPasswordEncoder() {
         return new BCryptPasswordEncoder();
@@ -28,41 +27,33 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 
         http
-            // 🚫 Desactivamos CSRF para API REST (usamos tokens, no sesiones)
             .csrf(csrf -> csrf.disable())
 
-            // 🔑 Autorización de rutas
             .authorizeHttpRequests(auth -> auth
+                // === 📌 Rutas públicas (sin autenticación) ===
+                .requestMatchers(HttpMethod.POST, "/users", "/users/login", "/api/users", "/api/login").permitAll()
+                .requestMatchers(HttpMethod.GET, "/users/**").permitAll()
+                .requestMatchers("/test-email", "/", "/index",
+                                 "/swagger-ui.html", "/swagger-ui/**",
+                                 "/v3/api-docs/**", "/swagger-resources/**").permitAll()
 
-                // === 📌 RUTAS PÚBLICAS (sin autenticación) ===
-                .requestMatchers(HttpMethod.POST, "/users/**", "/api/users/**").permitAll()   // Registro de usuario
-                .requestMatchers(HttpMethod.POST, "/login", "/api/login", "/users/login").permitAll() // Login público
-
-                // Swagger y documentación pública
-                .requestMatchers(
-                    "/", "/index", "/error",
-                    "/test-email",
-                    "/swagger-ui.html", "/swagger-ui/**",
-                    "/v3/api-docs/**", "/swagger-resources/**"
-                ).permitAll()
-
-                // === 👤 RUTAS QUE REQUIEREN TOKEN (cualquier usuario válido) ===
+                // === 👤 Rutas autenticadas (cualquier usuario con token válido) ===
                 .requestMatchers("/tickets/cliente/**").authenticated()
                 .requestMatchers(HttpMethod.PUT, "/tickets/*/notificacion").authenticated()
 
-                // === 👑 RUTAS SOLO ADMIN ===
-                .requestMatchers(HttpMethod.POST, "/tickets/**").hasAuthority("ROLE_ADMIN")
+                // === 👑 Rutas exclusivas ADMIN ===
+                .requestMatchers(HttpMethod.POST, "/tickets").hasAuthority("ROLE_ADMIN")
                 .requestMatchers(HttpMethod.PUT, "/tickets/**").hasAuthority("ROLE_ADMIN")
                 .requestMatchers(HttpMethod.DELETE, "/tickets/**").hasAuthority("ROLE_ADMIN")
 
-                // 🔒 Cualquier otra ruta requiere autenticación
+                // === 🔒 Todo lo demás requiere autenticación
                 .anyRequest().authenticated()
             )
 
-            // 🛑 No usamos sesiones, solo JWT (STATELESS)
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .sessionManagement(session -> session
+                .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+            )
 
-            // 🔐 Filtro de JWT antes del filtro estándar de Spring Security
             .addFilterBefore(new JWTAuthorizationFilter(), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
