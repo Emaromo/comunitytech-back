@@ -16,7 +16,6 @@ import org.springframework.security.web.firewall.StrictHttpFirewall;
 @Configuration
 public class SecurityConfig {
 
-    /** 🔐 Codificador de contraseñas seguro (BCrypt) */
     @Bean
     public BCryptPasswordEncoder bCryptPasswordEncoder() {
         return new BCryptPasswordEncoder();
@@ -27,7 +26,7 @@ public class SecurityConfig {
         return bCryptPasswordEncoder();
     }
 
-    /** 🚧 Firewall permisivo (permite caracteres codificados en URLs) */
+    /** 🔥 Firewall permissivo para permitir URLs codificadas */
     @Bean
     public HttpFirewall allowUrlEncodedHttpFirewall() {
         StrictHttpFirewall firewall = new StrictHttpFirewall();
@@ -45,48 +44,41 @@ public class SecurityConfig {
         return web -> web.httpFirewall(firewall);
     }
 
-    /** 🔐 Configuración principal de seguridad (filtros, rutas y JWT) */
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 
         http
-            .csrf(csrf -> csrf.disable()) // No usamos CSRF porque trabajamos con JWT
+            .csrf(csrf -> csrf.disable())
 
             .authorizeHttpRequests(auth -> auth
-
-                /** 🔓 RUTAS PÚBLICAS (sin token requerido) */
+                
+                /** 🔓 Rutas públicas SIN token (solo rutas GET o generales) */
                 .requestMatchers(
                     "/", "/index",
                     "/swagger-ui.html", "/swagger-ui/**",
                     "/v3/api-docs/**", "/swagger-resources/**",
-
-                    // 🚀 Login permitidos (todas las variantes)
-                    "/login", "/api/login", "/users/login",
-
-                    // 🚀 Registro de usuarios (todas las variantes)
-                    HttpMethod.POST, "/users", "/api/users", "/users/**", "/api/users/**",
-
-                    // 🚀 Endpoint opcional de test email
-                    "/test-email"
+                    "/test-email",
+                    "/login", "/api/login", "/users/login"
                 ).permitAll()
 
-                /** 👤 RUTAS QUE REQUIEREN USUARIO AUTENTICADO */
+                /** 🔓 Rutas públicas POST (registro de usuarios) */
+                .requestMatchers(HttpMethod.POST, "/users", "/api/users").permitAll()
+
+                /** 👤 Rutas accesibles con autenticación */
                 .requestMatchers("/tickets/cliente/**").authenticated()
                 .requestMatchers(HttpMethod.PUT, "/tickets/*/notificacion").authenticated()
 
-                /** 👑 RUTAS SOLO PARA ADMINISTRADORES */
+                /** 👑 Rutas para administradores (modificación de tickets) */
                 .requestMatchers(HttpMethod.POST, "/tickets").hasAuthority("ROLE_ADMIN")
                 .requestMatchers(HttpMethod.PUT, "/tickets/**").hasAuthority("ROLE_ADMIN")
                 .requestMatchers(HttpMethod.DELETE, "/tickets/**").hasAuthority("ROLE_ADMIN")
 
-                /** 🔒 Cualquier otra ruta requiere autenticación */
+                /** 🔒 Todo lo demás requiere autenticación */
                 .anyRequest().authenticated()
             )
 
-            /** ♻️ Modo sin sesiones → usamos solo JWT */
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-            /** ⚙️ Aplicamos nuestro filtro JWT antes del default */
             .addFilterBefore(new JWTAuthorizationFilter(), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
