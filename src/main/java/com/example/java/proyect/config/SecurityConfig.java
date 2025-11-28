@@ -27,26 +27,32 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 
         http
+            .cors() // ⬅️ ACTIVAMOS CORS PARA QUE USE CorsConfig
+            .and()
             .csrf(csrf -> csrf.disable())
 
             .authorizeHttpRequests(auth -> auth
-                // === 📌 Rutas públicas (sin autenticación) ===
+                // 💡 IMPORTANTE → Permitir OPTIONS para preflight (CORS)
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+
+                // === 📌 RUTAS PÚBLICAS ===
                 .requestMatchers(HttpMethod.POST, "/users", "/users/login", "/api/users", "/api/login").permitAll()
                 .requestMatchers(HttpMethod.GET, "/users/**").permitAll()
+
                 .requestMatchers("/test-email", "/", "/index",
                                  "/swagger-ui.html", "/swagger-ui/**",
                                  "/v3/api-docs/**", "/swagger-resources/**").permitAll()
 
-                // === 👤 Rutas autenticadas (cualquier usuario con token válido) ===
+                // === 👤 CLIENTE AUTENTICADO ===
                 .requestMatchers("/tickets/cliente/**").authenticated()
                 .requestMatchers(HttpMethod.PUT, "/tickets/*/notificacion").authenticated()
 
-                // === 👑 Rutas exclusivas ADMIN ===
+                // === 👑 ADMIN ===
                 .requestMatchers(HttpMethod.POST, "/tickets").hasAuthority("ROLE_ADMIN")
                 .requestMatchers(HttpMethod.PUT, "/tickets/**").hasAuthority("ROLE_ADMIN")
                 .requestMatchers(HttpMethod.DELETE, "/tickets/**").hasAuthority("ROLE_ADMIN")
 
-                // === 🔒 Todo lo demás requiere autenticación
+                // 🔒 Todo lo demás autenticado
                 .anyRequest().authenticated()
             )
 
