@@ -1,59 +1,35 @@
 package com.example.java.proyect.config;
 
-import java.util.List;
-
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.web.filter.CorsFilter;
+import org.springframework.web.servlet.config.annotation.CorsRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-/**
- * 🌐 CONFIGURACIÓN GLOBAL DE CORS PARA SPRING BOOT
- * ------------------------------------------------
- * - Permite que el frontend (local y deployado) se conecte al backend.
- * - Mantiene SecurityConfig separado y limpio.
- * - Compatible con JWT y cookies (con allowCredentials=true).
- */
-@Configuration
+@Configuration  // Indica que esta clase provee configuraciones a la aplicación
 public class CorsConfig {
 
     @Bean
-    public CorsFilter corsFilter() {
-        CorsConfiguration config = new CorsConfiguration();
-
-        // 🔑 Permite credenciales (Authorization, cookies, JWT)
-        config.setAllowCredentials(true);
-
-        // 🌍 Dominios permitidos (local + producción)
-        config.setAllowedOriginPatterns(List.of(
-            "http://localhost:3000",            // Frontend local (React)
-            "http://localhost:5173",            // Vite o React alternativo
-            "https://comunitytech.com.ar",      // Dominio principal
-            "https://www.comunitytech.com.ar"   // Variante con www
-        ));
-
-        // 📡 Métodos HTTP aceptados
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-
-        // 📦 Headers aceptados
-        config.setAllowedHeaders(List.of(
-            "Authorization",
-            "Content-Type",
-            "Accept",
-            "Origin"
-        ));
-
-        // 🎁 Headers que el frontend podrá leer como respuesta
-        config.setExposedHeaders(List.of(
-            "Authorization",
-            "Content-Type"
-        ));
-
-        // 🚀 Aplicar a TODAS las rutas
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", config);
-
-        return new CorsFilter(source);
+    public WebMvcConfigurer corsConfigurer() {
+        // Definimos un bean de configuración WebMvcConfigurer para configurar CORS globalmente
+        return new WebMvcConfigurer() {
+            @Override
+            public void addCorsMappings(CorsRegistry registry) {
+                // Habilitamos CORS para todas las rutas de la API
+                registry.addMapping("/**")
+                    // Permitimos orígenes específicos en lugar de "*", ya que allowCredentials=true requiere orígenes explícitos
+                    .allowedOrigins(
+                        "http://localhost:3000",   // Origen del entorno de desarrollo (React, Angular u otro en puerto 3000)
+                        "http://localhost:5173",   // Origen alternativo de desarrollo (por ejemplo Vite en puerto 5173)
+                        "https://comunitytech.com.ar" // Origen de producción (dominio de la aplicación frontend en producción)
+                    )
+                    // Permitimos los métodos HTTP que usará nuestra API
+                    .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                    // Permitimos los encabezados habituales que pueden enviar las solicitudes (Authorization para JWT, Content-Type, etc.)
+                    .allowedHeaders("Authorization", "Content-Type", "Origin", "Accept", "X-Requested-With")
+                    // Habilitamos el envío de credenciales (como cookies, cabeceras de autenticación). 
+                    // Esto requiere orígenes explícitos (no se puede usar "*") y en el cliente hay que habilitar las credenciales.
+                    .allowCredentials(true);
+            }
+        };
     }
 }
