@@ -1,80 +1,54 @@
 package com.example.java.proyect.config;
 
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.security.web.firewall.HttpFirewall;
-import org.springframework.security.web.firewall.StrictHttpFirewall;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
+/**
+ * Configuración de seguridad de Spring Security con JWT.
+ * Se deshabilita CSRF (ya que usamos JWT), se configura CORS y se registra el filtro JWT.
+ * Se permiten sin autenticación las rutas de login y registro, y las peticiones OPTIONS (CORS preflight).
+ * Nota: Si despliegas con EasyPanel (Docker), asegúrate de configurar correctamente el "Proxy Port"
+ * (puerto interno del contenedor, e.g. 8080) para que tu dominio apunte al puerto correcto de tu app.
+ * Las cabeceras CORS son manejadas por esta configuración, por lo que no se requiere ajustar nada en el proxy.
+ */
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
 
-    private final JWTAuthorizationFilter jwtFilter;
-
-    public SecurityConfig(JWTAuthorizationFilter jwtFilter) {
-        this.jwtFilter = jwtFilter;
-    }
+    @Autowired
+    private JWTAuthorizationFilter jwtAuthorizationFilter;
 
     @Bean
-    public BCryptPasswordEncoder bCryptPasswordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        // Habilitar CORS con la configuración global (CorsConfig) y desactivar CSRF
+        http.cors().and().csrf().disable();
 
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return bCryptPasswordEncoder();
-    }
+        // Configurar las políticas de acceso
+        http.authorizeHttpRequests(auth -> auth
+            // Permitir todas las peticiones OPTIONS (preflight de CORS) sin autenticación
+            .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+            // Permitir sin autenticación los endpoints públicos de autenticación (login y registro)
+            .requestMatchers("/auth/**", "/api/auth/**").permitAll() // ajustar rutas según tu API
+            // Cualquier otra petición requiere autenticación
+            .anyRequest().authenticated()
+        );
 
-    @Bean
-    public HttpFirewall customHttpFirewall() {
-        StrictHttpFirewall firewall = new StrictHttpFirewall();
-        firewall.setAllowUrlEncodedPercent(true);
-        firewall.setAllowUrlEncodedSlash(true);
-        firewall.setAllowUrlEncodedDoubleSlash(true);
-        firewall.setAllowSemicolon(true);
-        firewall.setAllowBackSlash(true);
-        firewall.setAllowUrlEncodedPeriod(true);
-        return firewall;
-    }
+        // Configurar sesión: sin estado (no se usarán sesiones HTTP)
+        http.sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
 
-    @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
-        return config.getAuthenticationManager();
-    }
+        // Registrar el filtro JWT antes del filtro de autenticación por contraseña de Spring
+        http.addFilterBefore(jwtAuthorizationFilter, UsernamePasswordAuthenticationFilter.class);
 
-    @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        http
-            .cors().and()
-            .csrf(csrf -> csrf.disable())
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                .requestMatchers(HttpMethod.POST, "/users", "/users/login", "/api/users", "/api/login").permitAll()
-                .requestMatchers(HttpMethod.GET, "/users/**").permitAll()
-                .requestMatchers("/test-email", "/", "/index",
-                                 "/swagger-ui.html", "/swagger-ui/**",
-                                 "/v3/api-docs/**", "/swagger-resources/**").permitAll()
-                .requestMatchers("/tickets/cliente/**").authenticated()
-                .requestMatchers(HttpMethod.PUT, "/tickets/*/notificacion").authenticated()
-                .requestMatchers(HttpMethod.POST, "/tickets").hasAuthority("ROLE_ADMIN")
-                .requestMatchers(HttpMethod.PUT, "/tickets/**").hasAuthority("ROLE_ADMIN")
-                .requestMatchers(HttpMethod.DELETE, "/tickets/**").hasAuthority("ROLE_ADMIN")
-                .anyRequest().authenticated()
-            )
-            .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
-
-        http.setSharedObject(HttpFirewall.class, customHttpFirewall());
         return http.build();
     }
 }

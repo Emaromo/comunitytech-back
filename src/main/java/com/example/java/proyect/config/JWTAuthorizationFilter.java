@@ -25,7 +25,7 @@ public class JWTAuthorizationFilter extends OncePerRequestFilter {
 
         String path = request.getServletPath();
 
-        // === 📌 Rutas públicas excluidas del filtro JWT ===
+        // Excluir rutas públicas del filtro JWT
         if (path.equals("/login") || 
             path.equals("/api/login") ||
             path.equals("/users") ||
@@ -36,7 +36,6 @@ public class JWTAuthorizationFilter extends OncePerRequestFilter {
             return;
         }
 
-        // === 🛡️ Leer y validar token JWT ===
         String header = request.getHeader(SecurityConstants.HEADER_STRING);
         if (header == null || !header.startsWith(SecurityConstants.TOKEN_PREFIX + " ")) {
             filterChain.doFilter(request, response);
@@ -54,7 +53,7 @@ public class JWTAuthorizationFilter extends OncePerRequestFilter {
                     new UsernamePasswordAuthenticationToken(
                             email,
                             null,
-                            Collections.singletonList(new SimpleGrantedAuthority(role))
+                            Collections.singletonList(new SimpleGrantedAuthority(role))  // ⬅️ Este rol se usa para `.hasAuthority(...)`
                     );
 
             SecurityContextHolder.getContext().setAuthentication(authentication);

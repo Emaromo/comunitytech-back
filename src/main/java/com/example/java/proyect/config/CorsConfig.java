@@ -1,58 +1,35 @@
 package com.example.java.proyect.config;
 
-import java.util.List;
+
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.web.filter.CorsFilter;
+import org.springframework.web.servlet.config.annotation.CorsRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
- * 🌐 CONFIGURACIÓN GLOBAL DE CORS PARA SPRING BOOT
- * ------------------------------------------------
- * - Permite que el frontend (local y deployado) se conecte al backend.
- * - Compatible con JWT y cookies (con allowCredentials=true).
+ * Configuración global de CORS para permitir peticiones desde el frontend en producción
+ * (comunitytech.com.ar) y desarrollo (localhost:5173).
  */
 @Configuration
 public class CorsConfig {
 
     @Bean
-    public CorsFilter corsFilter() {
-        CorsConfiguration config = new CorsConfiguration();
-
-        // 🔑 Permite credenciales (Authorization, cookies, JWT)
-        config.setAllowCredentials(true);
-
-        // 🌍 Dominios permitidos (local + producción)
-        config.setAllowedOrigins(List.of(
-            "http://localhost:3000",            // Frontend local
-            "http://localhost:5173",            // Vite local
-            "https://comunitytech.com.ar",      // Producción
-            "https://www.comunitytech.com.ar"   // Variante www
-        ));
-
-        // 📡 Métodos HTTP aceptados
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-
-        // 📦 Headers aceptados en la solicitud
-        config.setAllowedHeaders(List.of(
-            "Authorization",
-            "Content-Type",
-            "Accept",
-            "Origin"
-        ));
-
-        // 🎁 Headers expuestos en la respuesta
-        config.setExposedHeaders(List.of(
-            "Authorization",
-            "Content-Type"
-        ));
-
-        // 🚀 Aplicar a todas las rutas
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", config);
-
-        return new CorsFilter(source);
+    public WebMvcConfigurer corsConfigurer() {
+        return new WebMvcConfigurer() {
+            @Override
+            public void addCorsMappings(CorsRegistry registry) {
+                // Permite CORS en todos los endpoints ("/**")
+                registry.addMapping("/**")
+                        // Orígenes permitidos: dominio de producción con HTTPS y localhost de desarrollo
+                        .allowedOrigins("https://comunitytech.com.ar", "http://localhost:5173")
+                        // Métodos HTTP permitidos (GET, POST, PUT, DELETE, etc.)
+                        .allowedMethods("*")
+                        // Headers permitidos (todas las cabeceras)
+                        .allowedHeaders("*")
+                        // Permitir envío de credenciales (por ejemplo, cookies o Authorization headers)
+                        .allowCredentials(true);
+            }
+        };
     }
 }
